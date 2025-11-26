@@ -1,0 +1,648 @@
+https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Poor Ellys is too short, help petit Ellys to reach the christmas tree 🎄🍆</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Tailwind via CDN (no build step needed) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React + ReactDOM (UMD) -->
+    <script
+      crossorigin
+      src="https://unpkg.com/react@17/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"
+    ></script>
+
+    <!-- Babel to compile JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Firebase compat SDKs for single-file simplicity -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  </head>
+  <body class="bg-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const CHARGE_DURATION_MS = 2000; // how long you have to spam-tap
+      const TAPS_FOR_MAX_POWER = 50; // taps in the window for full power
+
+      // ===== Firebase setup (NOW global & correct) =====
+      const firebaseConfig = {
+        apiKey: "AIzaSyDDf_4ZwQSqoOPPYI240kmUL2D1QEDHTSs",
+        authDomain: "svgscience-6bb49.firebaseapp.com",
+        projectId: "svgscience-6bb49",
+        storageBucket: "svgscience-6bb49.firebasestorage.app",
+        messagingSenderId: "493468414507",
+        appId: "1:493468414507:web:fc5b8eaa2ea72763d3706e",
+        measurementId: "G-2TW8KPGW6L",
+      };
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.firestore();
+      // use the score_ptit collection that matches your rules
+      const scoresRef = db.collection("score_ptit");
+
+      function StarJumperMobile() {
+        const [isCharging, setIsCharging] = useState(false);
+        const [tapCount, setTapCount] = useState(0);
+        const [powerSnapshot, setPowerSnapshot] = useState(0); // power used for last jump
+
+        const [isJumping, setIsJumping] = useState(false);
+        const [jumpProgress, setJumpProgress] = useState(0); // 0..1
+
+        const [showStar, setShowStar] = useState(false);
+        const [reachedTop, setReachedTop] = useState(false);
+        const [treeBurned, setTreeBurned] = useState(false);
+
+        const [playerName, setPlayerName] = useState("");
+        const [scores, setScores] = useState([]); // best score per name from Firestore
+        const [lastResult, setLastResult] = useState(null);
+        const [hasHelper, setHasHelper] = useState(false);
+
+        const [timeLeft, setTimeLeft] = useState(0);
+        const [showLeaderboard, setShowLeaderboard] = useState(false); // hidden by default
+
+        const chargeTimeoutRef = useRef(null);
+        const chargeEndRef = useRef(null);
+        const tapCountRef = useRef(0);
+        const jumpAnimationRef = useRef(null);
+
+        // ===== Real-time Firestore leaderboard subscription =====
+        useEffect(() => {
+          const unsubscribe = scoresRef
+            .orderBy("score", "desc")
+            .limit(50)
+            .onSnapshot(
+              (snapshot) => {
+                const docs = snapshot.docs.map((doc) => {
+                  const d = doc.data() || {};
+                  return {
+                    name: d.name || "Anonymous",
+                    height: typeof d.score === "number" ? d.score : 0,
+                    success: !!d.hit,
+                  };
+                });
+                setScores(docs);
+              },
+              (err) => {
+                console.error("Error listening to leaderboard:", err);
+              }
+            );
+
+          return () => unsubscribe();
+        }, []);
+
+        // Countdown for the tapping window
+        useEffect(() => {
+          if (!isCharging) {
+            setTimeLeft(0);
+            return;
+          }
+
+          let frameId;
+
+          const update = () => {
+            if (!chargeEndRef.current) return;
+            const remainingMs = chargeEndRef.current - performance.now();
+            const clampedMs = Math.max(0, remainingMs);
+            setTimeLeft(clampedMs / 1000);
+            if (clampedMs > 0) {
+              frameId = requestAnimationFrame(update);
+            }
+          };
+
+          frameId = requestAnimationFrame(update);
+
+          return () => {
+            if (frameId) cancelAnimationFrame(frameId);
+          };
+        }, [isCharging]);
+
+        // Jump animation
+        useEffect(() => {
+          if (!isJumping) return;
+
+          let start = null;
+          const duration = 900; // ms
+
+          const jumpTick = (time) => {
+            if (!start) start = time;
+            const t = clamp((time - start) / duration, 0, 1);
+            setJumpProgress(t);
+
+            if (t < 1) {
+              jumpAnimationRef.current = requestAnimationFrame(jumpTick);
+            } else {
+              setIsJumping(false);
+            }
+          };
+
+          jumpAnimationRef.current = requestAnimationFrame(jumpTick);
+
+          return () => {
+            if (jumpAnimationRef.current)
+              cancelAnimationFrame(jumpAnimationRef.current);
+          };
+        }, [isJumping]);
+
+        const playChime = () => {
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.linearRampToValueAtTime(
+              1320,
+              ctx.currentTime + 0.25
+            );
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(
+              0.001,
+              ctx.currentTime + 0.3
+            );
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+          } catch (e) {
+            // silently ignore audio issues
+          }
+        };
+
+        // Write score to Firestore (global leaderboard)
+        const writeScoreToFirestore = async (entry) => {
+          const nameForScore = entry.name || "Anonymous";
+          const playerId = nameForScore.trim().toLowerCase() || "anonymous";
+
+          try {
+            await scoresRef.doc(playerId).set({
+              name: nameForScore,
+              score: entry.height,
+              picks: [], // required by your rules, list with <= 2 items
+              ts: firebase.firestore.FieldValue.serverTimestamp(),
+              hit: entry.success,
+            });
+            // Firestore rules will reject if score < previous score
+          } catch (err) {
+            console.error("Error writing score:", err);
+          }
+        };
+
+        const triggerJump = (rawPower) => {
+          const helperBoost = hasHelper ? rawPower * 0.05 : 0; // tiny nudge, not guaranteed
+          const finalPower = clamp(rawPower + helperBoost, 0, 1);
+
+          setPowerSnapshot(finalPower);
+          setIsCharging(false);
+          setIsJumping(true);
+          setJumpProgress(0);
+          setShowStar(false);
+          setReachedTop(false);
+
+          const heightPercent = Math.round(finalPower * 100);
+          const success = finalPower >= 0.9; // threshold to "reach" the top of the tree
+
+          const nameForScore = (playerName || "Anonymous").trim();
+          const newEntry = {
+            id: Date.now(),
+            name: nameForScore,
+            height: heightPercent,
+            success,
+          };
+
+          setLastResult(newEntry);
+
+          if (success) {
+            setShowStar(true);
+            setTreeBurned(false);
+            setReachedTop(true);
+            playChime();
+          } else {
+            // Rayane burns the tree 🔥
+            setTreeBurned(true);
+          }
+
+          // Firestore global leaderboard (best per name enforced by rules & docId)
+          writeScoreToFirestore(newEntry);
+        };
+
+        const startCharging = () => {
+          if (isJumping) return;
+
+          setShowStar(false);
+          setReachedTop(false);
+          // treeBurned only resets when you succeed
+
+          setIsCharging(true);
+
+          const now = performance.now();
+          chargeEndRef.current = now + CHARGE_DURATION_MS;
+
+          if (chargeTimeoutRef.current) {
+            window.clearTimeout(chargeTimeoutRef.current);
+          }
+
+          tapCountRef.current = 1;
+          setTapCount(1);
+
+          chargeTimeoutRef.current = window.setTimeout(() => {
+            const rawPower = clamp(
+              tapCountRef.current / TAPS_FOR_MAX_POWER,
+              0,
+              1
+            );
+            triggerJump(rawPower);
+            tapCountRef.current = 0;
+            setTapCount(0);
+          }, CHARGE_DURATION_MS);
+        };
+
+        const handleTap = () => {
+          if (isJumping) return;
+
+          if (!isCharging) {
+            startCharging();
+            return;
+          }
+
+          // Extra taps increase power
+          setTapCount((prev) => {
+            const next = prev + 1;
+            tapCountRef.current = next;
+            return next;
+          });
+        };
+
+        // Map jump progress + powerSnapshot to a vertical position (0 = ground, 1 = top)
+        const jumpHeightFactor = (() => {
+          if (!isJumping) return 0;
+          const t = jumpProgress;
+          const peak = powerSnapshot; // 0..1
+          const parabola = 4 * t * (1 - t); // 0..1
+          return parabola * peak;
+        })();
+
+        const ptitOffsetY = jumpHeightFactor * 140; // pixels up
+
+        const currentPower = isCharging
+          ? clamp(tapCount / TAPS_FOR_MAX_POWER, 0, 1)
+          : powerSnapshot;
+
+        const treeLeafClass = treeBurned ? "bg-red-700" : "bg-emerald-700";
+        const treeTrunkClass = treeBurned ? "bg-amber-950" : "bg-amber-900";
+
+        return (
+          <div className="min-h-screen w-full bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-50 flex items-center justify-center px-3 py-4">
+            <div className="w-full max-w-md rounded-3xl bg-slate-900/80 border border-slate-700 shadow-xl p-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <span>
+                      Decorate sVg christmas tree
+                    </span>
+                    <span className="text-lg">🎄🌟</span>
+                  </h1>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Ellys is too short to "crown" the tree, this frustrates Daddy and he burns everything down...(lube in hand for the afters)
+                    So we had to start the X-Mas pee to delete the fire. (Thanks Spanna & Myth)
+                  </p>
+                </div>
+                <div className="text-right text-[10px] text-slate-400">
+                  <div>Ellys is too short</div>
+                  <div>send him strength to jump</div>
+                </div>
+              </div>
+              
+              {/* Player name + toggleable leaderboard (best score per name, on the right) */}
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3 text-[11px]">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
+                  {/* Left side: description */}
+                  <div className="flex-1">
+                    <div className="font-semibold">Your leaderboard name</div>
+                    <p className="text-slate-300 mt-0.5">
+                      Ptit stays Ptit on screen, but here you can show who is
+                      behind the jump.
+                    </p>
+                  </div>
+
+                  {/* Right side: input + leaderboard */}
+                  <div className="w-full sm:w-1/2 flex flex-col items-end gap-2">
+                    {/* Name input on the right */}
+                    <input
+                      type="text"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-600 text-[11px] outline-none focus:ring-1 focus:ring-sky-500 text-right"
+                      maxLength={20}
+                    />
+
+                    {/* Toggle button aligned right, leaderboard hidden by default */}
+                    <div className="flex items-center justify-end w-full mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowLeaderboard((v) => !v)}
+                        className="px-2 py-1 rounded-full bg-slate-800 border border-slate-600 text-[10px]"
+                      >
+                        {showLeaderboard
+                          ? "Hide leaderboard"
+                          : "Show leaderboard"}
+                      </button>
+                    </div>
+
+                    {/* Leaderboard content, also on right */}
+                    {showLeaderboard && (
+                      <div className="mt-1 w-full">
+                        {scores.length === 0 ? (
+                          <div className="text-[10px] text-slate-400 text-right">
+                            Will you be a loser or a winner?
+                          </div>
+                        ) : (
+                          <div className="space-y-1 max-h-32 overflow-auto pr-1">
+                            {scores.map((entry, index) => (
+                              <div
+                                key={entry.name}
+                                className="flex items-center justify-between rounded-xl px-2 py-1 bg-slate-950/70 border border-slate-700/70"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] text-slate-400 w-4 text-right">
+                                    #{index + 1}
+                                  </span>
+                                  <span className="truncate font-medium">
+                                    {entry.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px]">
+                                  <span>{entry.height}%</span>
+                                  {entry.success && (
+                                    <span className="text-amber-300">🍆</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main game area */}
+              <button
+                type="button"
+                onClick={handleTap}
+                className="w-full aspect-[4/3] rounded-3xl bg-gradient-to-b from-sky-900/60 via-slate-900 to-slate-950 border border-slate-700/80 overflow-hidden relative active:scale-[0.99] transition-transform"
+              >
+                {/* Tree */}
+                <div className="absolute left-[8%] bottom-4 flex flex-col items-center">
+                  <div className="relative flex flex-col items-center">
+                    {/* Eggplant on top when success */}
+                    <div className="h-5 flex items-center justify-center mb-0.5">
+                      {showStar && (
+                        <div className="text-amber-300 text-xl drop-shadow">
+                          🍆
+                        </div>
+                      )}
+                    </div>
+                    {/* Flames when tree is burned */}
+                    {treeBurned && (
+                      <div className="absolute -top-2 inset-x-0 flex justify-center text-2xl">
+                        🔥🔥
+                      </div>
+                    )}
+                    {/* tree body */}
+                    <div
+                      className={`w-16 h-10 ${treeLeafClass} rounded-full shadow-inner`}
+                    />
+                    <div
+                      className={`w-20 h-12 ${treeLeafClass} rounded-full -mt-3 shadow-inner`}
+                    />
+                    <div
+                      className={`w-24 h-14 ${treeLeafClass} rounded-full -mt-4 shadow-inner`}
+                    />
+                    <div
+                      className={`w-6 h-6 ${treeTrunkClass} rounded-md mt-1`}
+                    />
+                    {/* simple ornaments */}
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-amber-200/80">
+                      ● ● ●
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ellys dwarf stickman + helper, RIGHT next to the tree, vertically offset for jump */}
+                <div
+                  className="absolute left-[30%] bottom-4 flex flex-col items-center transition-transform duration-75"
+                  style={{ transform: `translateY(-${ptitOffsetY}px)` }}
+                >
+                  <div className="relative flex flex-col items-center scale-90">
+                    {/* helper sitting on shoulder */}
+                    {hasHelper && (
+                      <div className="absolute top-50 right-20 flex flex-col items-center text-[10px] text-slate-100">
+                        <div className="w-4 h-4 rounded-full bg-fuchsia-400/90 border border-fuchsia-100" />
+                        <div className="-mt-100">
+                          HA YOU GOT SCAMMED!!!!!!🐥
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ptit dwarf stickman */}
+                    <div className="relative flex flex-col items-center">
+                      {/* head (smaller) */}
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-900 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full border border-slate-900 flex items-center justify-center">
+                          <div className="w-4 h-4 flex items-center justify-between">
+                            <span className="w-1 h-1 rounded-full bg-slate-900" />
+                            <span className="w-1 h-1 rounded-full bg-slate-900" />
+                          </div>
+                        </div>
+                      </div>
+                      {/* body (shorter) */}
+                      <div className="w-[2px] h-5 bg-slate-100 mt-1" />
+                        {/* arms (moved up close to head) */}
+                      <div className="flex -mt-5 items-center">
+                        <div className="w-3 h-[2px] bg-slate-100 -rotate-12 origin-left" />
+                        {/* arm holding eggplant */}
+                        <div className="relative w-3 h-[2px] bg-slate-100 rotate-12 origin-right flex items-center justify-end -mt-[2px]"> 
+                          <span className="absolute -top-[4px] right-[-7px] text-lg leading-none drop-shadow">
+                            🍆
+                          </span>
+                        </div>
+                      </div>
+                      {/* legs (shorter) */}
+                      <div className="flex mt-4">
+                        <div className="w-2 h-[2px] bg-slate-100 -rotate-6 origin-top" />
+                        <div className="w-2 h-[2px] bg-slate-100 rotate-6 origin-top" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-1 px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-600 text-[10px] uppercase tracking-wide">
+                    Ellys
+                  </div>
+                </div>
+
+                {/* Daddy stick figure with deodorant + lighter */}
+                <div className="absolute left-[65%] bottom-4 flex flex-col items-center">
+                  <div className="relative flex flex-col items-center">
+                    {/* head */}
+                    <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-900 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full border border-slate-900 flex items-center justify-center">
+                        <div className="w-4 h-4 flex items-center justify-between">
+                          <span className="w-1 h-1 rounded-full bg-slate-900" />
+                          <span className="w-1 h-1 rounded-full bg-slate-900" />
+                        </div>
+                      </div>
+                    </div>
+                    {/* body */}
+                    <div className="w-[2px] h-6 bg-slate-100 mt-1" />
+                    {/* arms with deodorant + lighter (moved up) */}
+                    <div className="flex -mt-6 items-center">
+                      {/* deodorant arm */}
+                      <div className="relative w-4 h-[2px] bg-slate-100 -rotate-12 origin-right flex items-center -mt-[6px]">
+                        <span className="absolute -top-[4px] left-[-8px] text-lg leading-none">
+                          🧴
+                        </span>
+                      </div>
+                    
+                      {/* lighter arm */}
+                      <div className="relative w-4 h-[2px] bg-slate-100 rotate-12 origin-left flex items-center justify-end -mt-[6px]">
+                        <span className="absolute -top-[4px] right-[-8px] text-lg leading-none">
+                          🔥
+                        </span>
+                      </div>
+                    </div>                    
+                    {/* legs */}
+                    <div className="flex mt-7">
+                      <div className="w-3 h-[2px] bg-slate-100 -rotate-6 origin-top" />
+                      <div className="w-3 h-[2px] bg-slate-100 rotate-6 origin-top" />
+                    </div>
+                    {/* flame effect when tree burned */}
+                    {treeBurned && (
+                      <div className="absolute -top-4 right-[-10px] text-xl">
+                        🔥🔥
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-1 px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-600 text-[10px] uppercase tracking-wide">
+                    Daddy (with lube)
+                  </div>
+                </div>
+
+                {/* Tap hint */}
+                <div className="absolute inset-x-0 top-2 flex justify-center">
+                  <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur text-[10px] text-slate-100 border border-slate-600/70">
+                    {!isCharging &&
+                      !isJumping &&
+                      "Tap rapidly to start charging!"}
+                    {isCharging &&
+                      `Spam taps! ${
+                        timeLeft > 0 ? timeLeft.toFixed(1) : "0.0"
+                      }s left`}
+                    {isJumping && "Watch Ptit's jump!"}
+                  </div>
+                </div>
+              </button>
+
+              {/* Power meter & jump info */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-300">
+                  <span>Jump power</span>
+                  <span>
+                    {Math.round(currentPower * 100)}%
+                    {hasHelper && " (helper maybe nudging)"}
+                  </span>
+                </div>
+                <div className="h-5 rounded-full bg-slate-800 overflow-hidden border border-slate-700 relative">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-400 via-amber-300 to-red-400"
+                    style={{ width: `${clamp(currentPower * 100, 4, 100)}%` }}
+                  />
+                </div>
+                {lastResult && (
+                  <div className="text-[11px] text-slate-300 flex justify-between">
+                    <span>
+                      Last jump: {lastResult.height}% height –{" "}
+                      {lastResult.success
+                        ? "eggplant on top!"
+                        : "Rayane burned the tree 💥"}
+                    </span>
+                    {reachedTop && (
+                      <span className="text-amber-300 font-semibold">
+                        🍆 NICE!
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Send money to get a Buff*/}
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3 space-y-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold flex items-center gap-1">
+                      <span>Helper (1€ tip)</span>
+                      <span className="text-xs">❤️</span>
+                    </div>
+                    <p className="text-slate-300 mt-0.5">
+                      Get a jump buff - pay me.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href="https://www.paypal.me/hth106"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 rounded-full bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-xs font-semibold shadow"
+                  >
+                    Tip 1€ on PayPal
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setHasHelper((v) => !v)}
+                    className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${
+                      hasHelper
+                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-200"
+                        : "bg-slate-800 border-slate-600 text-slate-200"
+                    }`}
+                  >
+                    {hasHelper ? "Helper active" : "I tipped – summon helper"}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-snug">
+                  Buff details: your helper shows up as a cute NPC on Ptit's
+                  shoulder and might give a tiny nudge to jump power. No
+                  promises, no guarantees that it actually helps with your
+                  score.
+                </p>
+                <p className="text-[10px] text-slate-500">SEND MONEY</p>
+              </div>
+
+              <div className="text-[9px] text-slate-500 text-center">
+                Tap the game area to play. Works best in portrait mode.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.render(<StarJumperMobile />, document.getElementById("root"));
+    </script>
+  </body>
+</html>
