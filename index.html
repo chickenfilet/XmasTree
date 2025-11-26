@@ -272,21 +272,28 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
           }, CHARGE_DURATION_MS);
         };
 
-        const handleTap = () => {
-          if (isJumping) return;
+const handleTap = () => {
+  if (isJumping) return;
 
-          if (!isCharging) {
-            startCharging();
-            return;
-          }
+  // NEW: Require player name
+  if (!playerName.trim()) {
+    alert("Please enter a name before playing!");
+    return;
+  }
 
-          // Extra taps increase power
-          setTapCount((prev) => {
-            const next = prev + 1;
-            tapCountRef.current = next;
-            return next;
-          });
-        };
+  if (!isCharging) {
+    startCharging();
+    return;
+  }
+
+  // Extra taps increase power
+  setTapCount((prev) => {
+    const next = prev + 1;
+    tapCountRef.current = next;
+    return next;
+  });
+};
+
 
         // Map jump progress + powerSnapshot to a vertical position (0 = ground, 1 = top)
         const jumpHeightFactor = (() => {
