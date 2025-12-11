@@ -5,10 +5,10 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
     <title>Poor Ellys is too short, help petit Ellys to reach the christmas tree 🎄🍆</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Tailwind via CDN (no build step needed) -->
+
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React + ReactDOM (UMD) -->
+
     <script
       crossorigin
       src="https://unpkg.com/react@17/umd/react.development.js"
@@ -18,10 +18,10 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
       src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"
     ></script>
 
-    <!-- Babel to compile JSX in the browser -->
+
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase compat SDKs for single-file simplicity -->
+
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   </head>
@@ -79,7 +79,7 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
         const tapCountRef = useRef(0);
         const jumpAnimationRef = useRef(null);
 
-        // ===== Real-time Firestore leaderboard subscription =====
+        
         useEffect(() => {
           const unsubscribe = scoresRef
             .orderBy("score", "desc")
@@ -135,7 +135,7 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
           if (!isJumping) return;
 
           let start = null;
-          const duration = 900; // ms
+          const duration = 900; 
 
           const jumpTick = (time) => {
             if (!start) start = time;
@@ -275,7 +275,7 @@ https://chickenfilet.github.io/Ellys_2short/<!DOCTYPE html>
 const handleTap = () => {
   if (isJumping) return;
 
-  // NEW: Require player name
+
   if (!playerName.trim()) {
     alert("Please enter a name before playing!");
     return;
@@ -286,7 +286,7 @@ const handleTap = () => {
     return;
   }
 
-  // Extra taps increase power
+
   setTapCount((prev) => {
     const next = prev + 1;
     tapCountRef.current = next;
@@ -295,12 +295,11 @@ const handleTap = () => {
 };
 
 
-        // Map jump progress + powerSnapshot to a vertical position (0 = ground, 1 = top)
         const jumpHeightFactor = (() => {
           if (!isJumping) return 0;
           const t = jumpProgress;
-          const peak = powerSnapshot; // 0..1
-          const parabola = 4 * t * (1 - t); // 0..1
+          const peak = powerSnapshot; //
+          const parabola = 4 * t * (1 - t); // 
           return parabola * peak;
         })();
 
@@ -422,7 +421,7 @@ const handleTap = () => {
                     <div className="h-5 flex items-center justify-center mb-0.5">
                       {showStar && (
                         <div className="text-amber-300 text-xl drop-shadow">
-                          🍆
+                          🎂
                         </div>
                       )}
                     </div>
