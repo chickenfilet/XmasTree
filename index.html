@@ -592,56 +592,6 @@ const handleTap = () => {
                   </div>
                 )}
               </div>
-
-              {/* Send money to get a Buff*/}
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3 space-y-2 text-[11px]">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-semibold flex items-center gap-1">
-                      <span>Helper (1€ tip)</span>
-                      <span className="text-xs">❤️</span>
-                    </div>
-                    <p className="text-slate-300 mt-0.5">
-                      Get a jump buff - pay me.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href="https://www.paypal.me/hth106"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1.5 rounded-full bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-xs font-semibold shadow"
-                  >
-                    Tip 1€ on PayPal
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setHasHelper((v) => !v)}
-                    className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${
-                      hasHelper
-                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-200"
-                        : "bg-slate-800 border-slate-600 text-slate-200"
-                    }`}
-                  >
-                    {hasHelper ? "Helper active" : "I tipped – summon helper"}
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 leading-snug">
-                  Buff details: your helper shows up as a cute NPC on your
-                  shoulder and might give a tiny nudge to jump power. No
-                  promises, no guarantees that it actually helps with your
-                  score.
-                </p>
-                <p className="text-[10px] text-slate-500">SEND MONEY</p>
-              </div>
-
-              <div className="text-[9px] text-slate-500 text-center">
-                Tap the game area to play. Works best in portrait mode.
-              </div>
-            </div>
-          </div>
-        );
       }
       ReactDOM.render(<StarJumperMobile />, document.getElementById("root"));
     </script>
