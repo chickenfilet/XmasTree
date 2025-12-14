@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Poor Ellys is too short, help petit Ellys to reach the christmas tree 🎄</title>
+    <title>Tap fast enough to put the cake on the tree 🎄</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 
@@ -104,7 +104,7 @@
           return () => unsubscribe();
         }, []);
 
-        // Countdown for the tapping window
+        
         useEffect(() => {
           if (!isCharging) {
             setTimeLeft(0);
@@ -180,7 +180,6 @@
             osc.start();
             osc.stop(ctx.currentTime + 0.35);
           } catch (e) {
-            // silently ignore audio issues
           }
         };
 
@@ -233,11 +232,10 @@
             setReachedTop(true);
             playChime();
           } else {
-            // Rayane burns the tree 🔥
+            //  burns the tree 🔥
             setTreeBurned(true);
           }
 
-          // Firestore global leaderboard (best per name enforced by rules & docId)
           writeScoreToFirestore(newEntry);
         };
 
